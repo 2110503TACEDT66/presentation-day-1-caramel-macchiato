@@ -78,7 +78,7 @@ exports.getAllWorkingSpace = async (req, res, next) => {
 
 exports.getWorkingSpace = async (req, res, next) => {
   try {
-    const workingspace = await WorkingSpace.findById(req.params.id);
+    const workingspace = await WorkingSpace.findById(req.params.id).populate('reservation');
 
     if (!workingspace) {
       return res.status(400).json({ success: false });
