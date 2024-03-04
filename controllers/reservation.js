@@ -62,7 +62,7 @@ exports.getReservation = async (req, res, next) => {
       success: true,
       data: reservation,
     });
-  } catch (error) {
+  } catch (error) { 
     console.log(error);
     return res
       .status(500)
@@ -72,6 +72,12 @@ exports.getReservation = async (req, res, next) => {
 
 exports.addReservation = async (req, res, next) => {
   try {
+    if (!req.body.reserveDate) {
+      return res.status(400).json({
+        success: false,
+        message: `User does not provided reserve date`,
+      });
+    }
     req.body.workingSpace = req.params.workingSpaceId;
 
     const workingspace = await WorkingSpace.findById(req.params.workingSpaceId);
@@ -82,6 +88,8 @@ exports.addReservation = async (req, res, next) => {
       });
     }
 
+
+
     // add user Id to req.body
     req.body.user = req.user.id;
     // Check for existed reservation
@@ -91,6 +99,23 @@ exports.addReservation = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: `The user with ID ${req.user.id} has already made 3 reservations`,
+      });
+    }
+    if (workingspace.remaining > 0) {
+      await WorkingSpace.findByIdAndUpdate(
+        req.params.workingSpaceId,
+        {
+          remaining: workingspace.remaining - 1,
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: `This Working Space is full!`,
       });
     }
     const reservation = await Reservation.create(req.body);
@@ -161,6 +186,20 @@ exports.deleteReservation = async (req, res, next) => {
         message: `User ${req.user.id} is not authorized to delete this reservation`,
       });
     }
+
+    const spaceData = await WorkingSpace.findById(reservation.workingSpace);
+
+    await WorkingSpace.findByIdAndUpdate(
+      reservation.workingSpace,
+      {
+        remaining: spaceData.remaining + 1,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
     await reservation.deleteOne();
     res.status(200).json({
       success: true,
@@ -171,5 +210,67 @@ exports.deleteReservation = async (req, res, next) => {
     return res
       .status(500)
       .json({ success: false, message: "Cannot delete Reservation" });
+  }
+};
+
+exports.clearSpace = async (req, res, next) => {
+  try {
+    const workingspace = await WorkingSpace.findById(req.params.id);
+
+    if (!workingspace) {
+      return res.status(400).json({
+        success: false,
+        message: `No working space with the id of ${req.params.id}1`,
+      });
+    }
+
+    const clearReservations = await Reservation.deleteMany({
+      workingSpace: req.params.id,
+    });
+
+    await WorkingSpace.findByIdAndUpdate(
+      req.params.id,
+      {
+        remaining: workingspace.remaining + clearReservations.deletedCount,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    return res
+      .status(200)
+      .json({ success: true, message: "This working space is cleared" });
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Cannot delete Reservation" });
+  }
+};
+
+exports.getUserReservation = async (req, res, next) => {
+  try {
+    const reservation = await Reservation.find({ user: req.user.id }).populate({
+      path: "workingSpace",
+      select: "name description tel",
+    });
+
+    if (!reservation) {
+      return res.status(404).json({
+        success: false,
+        message: `No reservation with the id of ${req.params.id}1`,
+      });
+    }
+    res.status(200).json({
+      success: true,
+      data: reservation,
+    });
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Cannot find reservation" });
   }
 };
