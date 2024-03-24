@@ -39,7 +39,7 @@ app.use(xss());
 //Rate Limiting
 const limiter = rateLimit({
   windowsMs: 10 * 60 * 1000, //10 mins
-  max: 20,
+  max: 10000,
 });
 app.use(limiter);
 
@@ -61,7 +61,7 @@ const swaggerOptions = {
       description: "A simple Express Co-Space API",
     },
     servers: [
-      {
+      { 
         url: "http://localhost:1200/api/v1",
       },
     ],
